@@ -1,30 +1,98 @@
 <?php
 namespace Elementor;
 
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
 
+/**
+ * Elementor image carousel widget.
+ *
+ * Elementor widget that displays a set of images in a rotating carousel or
+ * slider.
+ *
+ * @since 1.0.0
+ */
 class Widget_Image_Carousel extends Widget_Base {
 
+	/**
+	 * Get widget name.
+	 *
+	 * Retrieve image carousel widget name.
+	 *
+	 * @since 1.0.0
+	 * @access public
+	 *
+	 * @return string Widget name.
+	 */
 	public function get_name() {
 		return 'image-carousel';
 	}
 
+	/**
+	 * Get widget title.
+	 *
+	 * Retrieve image carousel widget title.
+	 *
+	 * @since 1.0.0
+	 * @access public
+	 *
+	 * @return string Widget title.
+	 */
 	public function get_title() {
 		return __( 'Image Carousel', 'elementor' );
 	}
 
+	/**
+	 * Get widget icon.
+	 *
+	 * Retrieve image carousel widget icon.
+	 *
+	 * @since 1.0.0
+	 * @access public
+	 *
+	 * @return string Widget icon.
+	 */
 	public function get_icon() {
 		return 'eicon-slider-push';
 	}
 
-	public function get_categories() {
-		return [ 'general-elements' ];
+	/**
+	 * Get widget keywords.
+	 *
+	 * Retrieve the list of keywords the widget belongs to.
+	 *
+	 * @since 2.1.0
+	 * @access public
+	 *
+	 * @return array Widget keywords.
+	 */
+	public function get_keywords() {
+		return [ 'image', 'photo', 'visual', 'carousel', 'slider' ];
 	}
 
+	/**
+	 * Retrieve the list of scripts the image carousel widget depended on.
+	 *
+	 * Used to set scripts dependencies required to run the widget.
+	 *
+	 * @since 1.3.0
+	 * @access public
+	 *
+	 * @return array Widget scripts dependencies.
+	 */
 	public function get_script_depends() {
 		return [ 'jquery-slick' ];
 	}
 
+	/**
+	 * Register image carousel widget controls.
+	 *
+	 * Adds different input fields to allow the user to change and customize the widget settings.
+	 *
+	 * @since 1.0.0
+	 * @access protected
+	 */
 	protected function _register_controls() {
 		$this->start_controls_section(
 			'section_image_carousel',
@@ -39,26 +107,33 @@ class Widget_Image_Carousel extends Widget_Base {
 				'label' => __( 'Add Images', 'elementor' ),
 				'type' => Controls_Manager::GALLERY,
 				'default' => [],
+				'show_label' => false,
+				'dynamic' => [
+					'active' => true,
+				],
 			]
 		);
 
 		$this->add_group_control(
 			Group_Control_Image_Size::get_type(),
 			[
-				'name' => 'thumbnail',
+				'name' => 'thumbnail', // Usage: `{name}_size` and `{name}_custom_dimension`, in this case `thumbnail_size` and `thumbnail_custom_dimension`.
+				'separator' => 'none',
 			]
 		);
 
 		$slides_to_show = range( 1, 10 );
 		$slides_to_show = array_combine( $slides_to_show, $slides_to_show );
 
-		$this->add_control(
+		$this->add_responsive_control(
 			'slides_to_show',
 			[
 				'label' => __( 'Slides to Show', 'elementor' ),
 				'type' => Controls_Manager::SELECT,
-				'default' => '3',
-				'options' => $slides_to_show,
+				'options' => [
+					'' => __( 'Default', 'elementor' ),
+				] + $slides_to_show,
+				'frontend_available' => true,
 			]
 		);
 
@@ -67,11 +142,13 @@ class Widget_Image_Carousel extends Widget_Base {
 			[
 				'label' => __( 'Slides to Scroll', 'elementor' ),
 				'type' => Controls_Manager::SELECT,
+				'description' => __( 'Set how many slides are scrolled per swipe.', 'elementor' ),
 				'default' => '2',
 				'options' => $slides_to_show,
 				'condition' => [
 					'slides_to_show!' => '1',
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -100,6 +177,7 @@ class Widget_Image_Carousel extends Widget_Base {
 					'dots' => __( 'Dots', 'elementor' ),
 					'none' => __( 'None', 'elementor' ),
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -120,13 +198,30 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'link',
 			[
-				'label' => 'Link to',
+				'label' => __( 'Link to', 'elementor' ),
 				'type' => Controls_Manager::URL,
-				'placeholder' => __( 'http://your-link.com', 'elementor' ),
+				'placeholder' => __( 'https://your-link.com', 'elementor' ),
 				'condition' => [
 					'link_to' => 'custom',
 				],
 				'show_label' => false,
+			]
+		);
+
+		$this->add_control(
+			'open_lightbox',
+			[
+				'label' => __( 'Lightbox', 'elementor' ),
+				'type' => Controls_Manager::SELECT,
+				'default' => 'default',
+				'options' => [
+					'default' => __( 'Default', 'elementor' ),
+					'yes' => __( 'Yes', 'elementor' ),
+					'no' => __( 'No', 'elementor' ),
+				],
+				'condition' => [
+					'link_to' => 'file',
+				],
 			]
 		);
 
@@ -173,6 +268,7 @@ class Widget_Image_Carousel extends Widget_Base {
 					'yes' => __( 'Yes', 'elementor' ),
 					'no' => __( 'No', 'elementor' ),
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -186,6 +282,7 @@ class Widget_Image_Carousel extends Widget_Base {
 					'yes' => __( 'Yes', 'elementor' ),
 					'no' => __( 'No', 'elementor' ),
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -195,6 +292,7 @@ class Widget_Image_Carousel extends Widget_Base {
 				'label' => __( 'Autoplay Speed', 'elementor' ),
 				'type' => Controls_Manager::NUMBER,
 				'default' => 5000,
+				'frontend_available' => true,
 			]
 		);
 
@@ -208,6 +306,7 @@ class Widget_Image_Carousel extends Widget_Base {
 					'yes' => __( 'Yes', 'elementor' ),
 					'no' => __( 'No', 'elementor' ),
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -224,6 +323,7 @@ class Widget_Image_Carousel extends Widget_Base {
 				'condition' => [
 					'slides_to_show' => '1',
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -233,6 +333,7 @@ class Widget_Image_Carousel extends Widget_Base {
 				'label' => __( 'Animation Speed', 'elementor' ),
 				'type' => Controls_Manager::NUMBER,
 				'default' => 500,
+				'frontend_available' => true,
 			]
 		);
 
@@ -246,6 +347,7 @@ class Widget_Image_Carousel extends Widget_Base {
 					'ltr' => __( 'Left', 'elementor' ),
 					'rtl' => __( 'Right', 'elementor' ),
 				],
+				'frontend_available' => true,
 			]
 		);
 
@@ -277,7 +379,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'arrows_position',
 			[
-				'label' => __( 'Arrows Position', 'elementor' ),
+				'label' => __( 'Position', 'elementor' ),
 				'type' => Controls_Manager::SELECT,
 				'default' => 'inside',
 				'options' => [
@@ -293,7 +395,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'arrows_size',
 			[
-				'label' => __( 'Arrows Size', 'elementor' ),
+				'label' => __( 'Size', 'elementor' ),
 				'type' => Controls_Manager::SLIDER,
 				'range' => [
 					'px' => [
@@ -313,7 +415,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'arrows_color',
 			[
-				'label' => __( 'Arrows Color', 'elementor' ),
+				'label' => __( 'Color', 'elementor' ),
 				'type' => Controls_Manager::COLOR,
 				'selectors' => [
 					'{{WRAPPER}} .elementor-image-carousel-wrapper .slick-slider .slick-prev:before, {{WRAPPER}} .elementor-image-carousel-wrapper .slick-slider .slick-next:before' => 'color: {{VALUE}};',
@@ -339,7 +441,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'dots_position',
 			[
-				'label' => __( 'Dots Position', 'elementor' ),
+				'label' => __( 'Position', 'elementor' ),
 				'type' => Controls_Manager::SELECT,
 				'default' => 'outside',
 				'options' => [
@@ -355,7 +457,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'dots_size',
 			[
-				'label' => __( 'Dots Size', 'elementor' ),
+				'label' => __( 'Size', 'elementor' ),
 				'type' => Controls_Manager::SLIDER,
 				'range' => [
 					'px' => [
@@ -375,7 +477,7 @@ class Widget_Image_Carousel extends Widget_Base {
 		$this->add_control(
 			'dots_color',
 			[
-				'label' => __( 'Dots Color', 'elementor' ),
+				'label' => __( 'Color', 'elementor' ),
 				'type' => Controls_Manager::COLOR,
 				'selectors' => [
 					'{{WRAPPER}} .elementor-image-carousel-wrapper .elementor-image-carousel .slick-dots li button:before' => 'color: {{VALUE}};',
@@ -442,6 +544,7 @@ class Widget_Image_Carousel extends Widget_Base {
 			[
 				'name' => 'image_border',
 				'selector' => '{{WRAPPER}} .elementor-image-carousel-wrapper .elementor-image-carousel .slick-slide-image',
+				'separator' => 'before',
 			]
 		);
 
@@ -516,7 +619,6 @@ class Widget_Image_Carousel extends Widget_Base {
 			Group_Control_Typography::get_type(),
 			[
 				'name' => 'caption_typography',
-				'label' => __( 'Typography', 'elementor' ),
 				'scheme' => Scheme_Typography::TYPOGRAPHY_4,
 				'selector' => '{{WRAPPER}} .elementor-image-carousel-caption',
 			]
@@ -526,15 +628,24 @@ class Widget_Image_Carousel extends Widget_Base {
 
 	}
 
+	/**
+	 * Render image carousel widget output on the frontend.
+	 *
+	 * Written in PHP and used to generate the final HTML.
+	 *
+	 * @since 1.0.0
+	 * @access protected
+	 */
 	protected function render() {
-		$settings = $this->get_settings();
+		$settings = $this->get_settings_for_display();
 
-		if ( empty( $settings['carousel'] ) )
+		if ( empty( $settings['carousel'] ) ) {
 			return;
+		}
 
 		$slides = [];
 
-		foreach ( $settings['carousel'] as $attachment ) {
+		foreach ( $settings['carousel'] as $index => $attachment ) {
 			$image_url = Group_Control_Image_Size::get_attachment_image_src( $attachment['id'], 'thumbnail', $settings );
 
 			$image_html = '<img class="slick-slide-image" src="' . esc_attr( $image_url ) . '" alt="' . esc_attr( Control_Media::get_image_alt( $attachment ) ) . '" />';
@@ -542,18 +653,43 @@ class Widget_Image_Carousel extends Widget_Base {
 			$link = $this->get_link_url( $attachment, $settings );
 
 			if ( $link ) {
-				$target = '';
+				$link_key = 'link_' . $index;
 
-				if ( ! empty( $link['is_external'] ) ) {
-					$target = ' target="_blank"';
+				$this->add_render_attribute( $link_key, [
+					'href' => $link['url'],
+					'data-elementor-open-lightbox' => $settings['open_lightbox'],
+					'data-elementor-lightbox-slideshow' => $this->get_id(),
+					'data-elementor-lightbox-index' => $index,
+				] );
+
+				if ( Plugin::$instance->editor->is_edit_mode() ) {
+					$this->add_render_attribute( $link_key, [
+						'class' => 'elementor-clickable',
+					] );
 				}
 
-				$image_html = sprintf( '<a href="%s"%s>%s</a>', $link['url'], $target, $image_html );
+				if ( ! empty( $link['is_external'] ) ) {
+					$this->add_render_attribute( $link_key, 'target', '_blank' );
+				}
+
+				if ( ! empty( $link['nofollow'] ) ) {
+					$this->add_render_attribute( $link_key, 'rel', 'nofollow' );
+				}
+
+				$image_html = '<a ' . $this->get_render_attribute_string( $link_key ) . '>' . $image_html . '</a>';
 			}
 
 			$image_caption = $this->get_image_caption( $attachment );
 
-			$slides[] = '<div class="slick-slide"><figure class="slick-slide-inner">' . $image_html . '<figcaption class="elementor-image-carousel-caption">' . $image_caption . '</figcaption></figure></div>';
+			$slide_html = '<div class="slick-slide"><figure class="slick-slide-inner">' . $image_html;
+
+			if ( ! empty( $image_caption ) ) {
+				$slide_html .= '<figcaption class="elementor-image-carousel-caption">' . $image_caption . '</figcaption>';
+			}
+
+			$slide_html .= '</figure></div>';
+
+			$slides[] = $slide_html;
 
 		}
 
@@ -561,53 +697,42 @@ class Widget_Image_Carousel extends Widget_Base {
 			return;
 		}
 
-		$is_slideshow = '1' === $settings['slides_to_show'];
-		$is_rtl = ( 'rtl' === $settings['direction'] );
-		$direction = $is_rtl ? 'rtl' : 'ltr';
-		$show_dots = ( in_array( $settings['navigation'], [ 'dots', 'both' ] ) );
-		$show_arrows = ( in_array( $settings['navigation'], [ 'arrows', 'both' ] ) );
+		$this->add_render_attribute( 'carousel', 'class', 'elementor-image-carousel' );
 
-		$slick_options = [
-			'slidesToShow' => absint( $settings['slides_to_show'] ),
-			'autoplaySpeed' => absint( $settings['autoplay_speed'] ),
-			'autoplay' => ( 'yes' === $settings['autoplay'] ),
-			'infinite' => ( 'yes' === $settings['infinite'] ),
-			'pauseOnHover' => ( 'yes' === $settings['pause_on_hover'] ),
-			'speed' => absint( $settings['speed'] ),
-			'arrows' => $show_arrows,
-			'dots' => $show_dots,
-			'rtl' => $is_rtl,
-		];
+		if ( 'none' !== $settings['navigation'] ) {
+			if ( 'dots' !== $settings['navigation'] ) {
+				$this->add_render_attribute( 'carousel', 'class', 'slick-arrows-' . $settings['arrows_position'] );
+			}
 
-		$carousel_classes = [ 'elementor-image-carousel' ];
-
-		if ( $show_arrows ) {
-			$carousel_classes[] = 'slick-arrows-' . $settings['arrows_position'];
-		}
-
-		if ( $show_dots ) {
-			$carousel_classes[] = 'slick-dots-' . $settings['dots_position'];
+			if ( 'arrows' !== $settings['navigation'] ) {
+				$this->add_render_attribute( 'carousel', 'class', 'slick-dots-' . $settings['dots_position'] );
+			}
 		}
 
 		if ( 'yes' === $settings['image_stretch'] ) {
-			$carousel_classes[] = 'slick-image-stretch';
-		}
-
-		if ( ! $is_slideshow ) {
-			$slick_options['slidesToScroll'] = absint( $settings['slides_to_scroll'] );
-		} else {
-			$slick_options['fade'] = ( 'fade' === $settings['effect'] );
+			$this->add_render_attribute( 'carousel', 'class', 'slick-image-stretch' );
 		}
 
 		?>
-		<div class="elementor-image-carousel-wrapper elementor-slick-slider" dir="<?php echo $direction; ?>">
-			<div class="<?php echo implode( ' ', $carousel_classes ); ?>" data-slider_options='<?php echo esc_attr( wp_json_encode( $slick_options ) ); ?>'>
+		<div class="elementor-image-carousel-wrapper elementor-slick-slider" dir="<?php echo $settings['direction']; ?>">
+			<div <?php echo $this->get_render_attribute_string( 'carousel' ); ?>>
 				<?php echo implode( '', $slides ); ?>
 			</div>
 		</div>
 		<?php
 	}
 
+	/**
+	 * Retrieve image carousel link URL.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 *
+	 * @param array $attachment
+	 * @param object $instance
+	 *
+	 * @return array|string|false An array/string containing the attachment URL, or false if no link.
+	 */
 	private function get_link_url( $attachment, $instance ) {
 		if ( 'none' === $instance['link_to'] ) {
 			return false;
@@ -617,6 +742,7 @@ class Widget_Image_Carousel extends Widget_Base {
 			if ( empty( $instance['link']['url'] ) ) {
 				return false;
 			}
+
 			return $instance['link'];
 		}
 
@@ -625,10 +751,20 @@ class Widget_Image_Carousel extends Widget_Base {
 		];
 	}
 
+	/**
+	 * Retrieve image carousel caption.
+	 *
+	 * @since 1.2.0
+	 * @access private
+	 *
+	 * @param array $attachment
+	 *
+	 * @return string The caption of the image.
+	 */
 	private function get_image_caption( $attachment ) {
-		$caption_type = $this->get_settings( 'caption_type' );
+		$caption_type = $this->get_settings_for_display( 'caption_type' );
 
-		if ( '' === $caption_type ) {
+		if ( empty( $caption_type ) ) {
 			return '';
 		}
 

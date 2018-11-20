@@ -1,14 +1,16 @@
-var TemplateLibraryLayoutView = require( 'elementor-templates/views/layout' ),
+var TemplateLibraryLayoutView = require( 'elementor-templates/views/library-layout' ),
 	TemplateLibraryCollection = require( 'elementor-templates/collections/templates' ),
 	TemplateLibraryManager;
 
 TemplateLibraryManager = function() {
 	var self = this,
-		modal,
 		deleteDialog,
 		errorDialog,
 		layout,
+		config = {},
+		startIntent = {},
 		templateTypes = {},
+		filterTerms = {},
 		templatesCollection;
 
 	var initLayout = function() {
@@ -18,35 +20,66 @@ TemplateLibraryManager = function() {
 	var registerDefaultTemplateTypes = function() {
 		var data = {
 			saveDialog: {
-				description: elementor.translate( 'save_your_template_description' )
+				description: elementor.translate( 'save_your_template_description' ),
 			},
 			ajaxParams: {
-				success: function( data ) {
-					self.getTemplatesCollection().add( data );
+				success: function( successData ) {
+					self.getTemplatesCollection().add( successData );
 
-					self.setTemplatesSource( 'local' );
-
-					self.showTemplates();
+					self.setTemplatesPage( 'local' );
 				},
-				error: function( data ) {
-					self.showErrorDialog( data );
-				}
-			}
+				error: function( errorData ) {
+					self.showErrorDialog( errorData );
+				},
+			},
 		};
 
 		_.each( [ 'page', 'section' ], function( type ) {
-			var safeData = Backbone.$.extend( true, {}, data, {
+			var safeData = jQuery.extend( true, {}, data, {
 				saveDialog: {
-					title: elementor.translate( 'save_your_template', [ elementor.translate( type ) ] )
-				}
+					title: elementor.translate( 'save_your_template', [ elementor.translate( type ) ] ),
+				},
 			} );
 
 			self.registerTemplateType( type, safeData );
 		} );
 	};
 
+	var registerDefaultFilterTerms = function() {
+		filterTerms = {
+			text: {
+				callback: function( value ) {
+					value = value.toLowerCase();
+
+					if ( this.get( 'title' ).toLowerCase().indexOf( value ) >= 0 ) {
+						return true;
+					}
+
+					return _.any( this.get( 'tags' ), function( tag ) {
+						return tag.toLowerCase().indexOf( value ) >= 0;
+					} );
+				},
+			},
+			type: {},
+			subtype: {},
+			favorite: {},
+		};
+	};
+
+	var setIntentFilters = function() {
+		jQuery.each( startIntent.filters, function( filterKey, filterValue ) {
+			self.setFilter( filterKey, filterValue, true );
+		} );
+	};
+
 	this.init = function() {
 		registerDefaultTemplateTypes();
+
+		registerDefaultFilterTerms();
+
+		elementor.addBackgroundClickListener( 'libraryToggleMore', {
+			element: '.elementor-template-library-template-more',
+		} );
 	};
 
 	this.getTemplateTypes = function( type ) {
@@ -61,38 +94,60 @@ TemplateLibraryManager = function() {
 		templateTypes[ type ] = data;
 	};
 
-	this.deleteTemplate = function( templateModel ) {
+	this.deleteTemplate = function( templateModel, options ) {
 		var dialog = self.getDeleteDialog();
 
 		dialog.onConfirm = function() {
-			elementor.ajax.send( 'delete_template', {
+			if ( options.onConfirm ) {
+				options.onConfirm();
+			}
+
+			elementorCommon.ajax.addRequest( 'delete_template', {
 				data: {
 					source: templateModel.get( 'source' ),
-					template_id: templateModel.get( 'template_id' )
+					template_id: templateModel.get( 'template_id' ),
 				},
-				success: function() {
+				success: function( response ) {
 					templatesCollection.remove( templateModel, { silent: true } );
 
-					self.showTemplates();
-				}
+					if ( options.onSuccess ) {
+						options.onSuccess( response );
+					}
+				},
 			} );
 		};
 
 		dialog.show();
 	};
 
-	this.importTemplate = function( templateModel ) {
+	this.importTemplate = function( templateModel, options ) {
+		options = options || {};
+
 		layout.showLoadingView();
 
 		self.requestTemplateContent( templateModel.get( 'source' ), templateModel.get( 'template_id' ), {
+			data: {
+				page_settings: options.withPageSettings,
+			},
 			success: function( data ) {
 				self.closeModal();
 
-				elementor.getRegion( 'sections' ).currentView.addChildModel( data );
+				elementor.channels.data.trigger( 'template:before:insert', templateModel );
+
+				elementor.getPreviewView().addChildModel( data.content, startIntent.importOptions || {} );
+
+				elementor.channels.data.trigger( 'template:after:insert', templateModel );
+
+				if ( options.withPageSettings ) {
+					elementor.settings.page.model.set( data.page_settings );
+				}
 			},
 			error: function( data ) {
 				self.showErrorDialog( data );
-			}
+			},
+			complete: function() {
+				layout.hideLoadingView();
+			},
 		} );
 	};
 
@@ -101,14 +156,14 @@ TemplateLibraryManager = function() {
 
 		_.extend( data, {
 			source: 'local',
-			type: type
+			type: type,
 		} );
 
 		if ( templateType.prepareSavedData ) {
 			data = templateType.prepareSavedData( data );
 		}
 
-		data.data = JSON.stringify( data.data );
+		data.content = JSON.stringify( data.content );
 
 		var ajaxParams = { data: data };
 
@@ -116,7 +171,7 @@ TemplateLibraryManager = function() {
 			_.extend( ajaxParams, templateType.ajaxParams );
 		}
 
-		elementor.ajax.send( 'save_template', ajaxParams );
+		elementorCommon.ajax.addRequest( 'save_template', ajaxParams );
 	};
 
 	this.requestTemplateContent = function( source, id, ajaxOptions ) {
@@ -124,26 +179,39 @@ TemplateLibraryManager = function() {
 			data: {
 				source: source,
 				edit_mode: true,
-				template_id: id
-			}
+				display: true,
+				template_id: id,
+			},
 		};
 
 		if ( ajaxOptions ) {
-			_.extend( options, ajaxOptions );
+			jQuery.extend( true, options, ajaxOptions );
 		}
 
-		return elementor.ajax.send( 'get_template_content', options );
+		return elementorCommon.ajax.addRequest( 'get_template_data', options );
+	};
+
+	this.markAsFavorite = function( templateModel, favorite ) {
+		var options = {
+			data: {
+				source: templateModel.get( 'source' ),
+				template_id: templateModel.get( 'template_id' ),
+				favorite: favorite,
+			},
+		};
+
+		return elementorCommon.ajax.addRequest( 'mark_template_as_favorite', options );
 	};
 
 	this.getDeleteDialog = function() {
 		if ( ! deleteDialog ) {
-			deleteDialog = elementor.dialogsManager.createWidget( 'confirm', {
+			deleteDialog = elementorCommon.dialogsManager.createWidget( 'confirm', {
 				id: 'elementor-template-library-delete-dialog',
 				headerMessage: elementor.translate( 'delete_template' ),
 				message: elementor.translate( 'delete_template_confirm' ),
 				strings: {
-					confirm: elementor.translate( 'delete' )
-				}
+					confirm: elementor.translate( 'delete' ),
+				},
 			} );
 		}
 
@@ -152,24 +220,13 @@ TemplateLibraryManager = function() {
 
 	this.getErrorDialog = function() {
 		if ( ! errorDialog ) {
-			errorDialog = elementor.dialogsManager.createWidget( 'alert', {
+			errorDialog = elementorCommon.dialogsManager.createWidget( 'alert', {
 				id: 'elementor-template-library-error-dialog',
-				headerMessage: elementor.translate( 'an_error_occurred' )
+				headerMessage: elementor.translate( 'an_error_occurred' ),
 			} );
 		}
 
 		return errorDialog;
-	};
-
-	this.getModal = function() {
-		if ( ! modal ) {
-			modal = elementor.dialogsManager.createWidget( 'lightbox', {
-				id: 'elementor-template-library-modal',
-				closeButton: false
-			} );
-		}
-
-		return modal;
 	};
 
 	this.getLayout = function() {
@@ -180,64 +237,137 @@ TemplateLibraryManager = function() {
 		return templatesCollection;
 	};
 
-	this.requestRemoteTemplates = function( callback, forceUpdate ) {
-		if ( templatesCollection && ! forceUpdate ) {
-			if ( callback ) {
-				callback();
+	this.getConfig = function( item ) {
+		if ( item ) {
+			return config[ item ];
+		}
+
+		return config;
+	};
+
+	this.requestLibraryData = function( options ) {
+		if ( templatesCollection && ! options.forceUpdate ) {
+			if ( options.onUpdate ) {
+				options.onUpdate();
 			}
 
 			return;
 		}
 
-		elementor.ajax.send( 'get_templates', {
-			success: function( data ) {
-				templatesCollection = new TemplateLibraryCollection( data );
+		if ( options.onBeforeUpdate ) {
+			options.onBeforeUpdate();
+		}
 
-				if ( callback ) {
-					callback();
+		var ajaxOptions = {
+			data: {},
+			success: function( data ) {
+				templatesCollection = new TemplateLibraryCollection( data.templates );
+
+				config = data.config;
+
+				if ( options.onUpdate ) {
+					options.onUpdate();
 				}
-			}
-		} );
+			},
+		};
+
+		if ( options.forceSync ) {
+			ajaxOptions.data.sync = true;
+		}
+
+		elementorCommon.ajax.addRequest( 'get_library_data', ajaxOptions );
 	};
 
-	this.startModal = function( onModalReady ) {
-		self.getModal().show();
-
-		self.setTemplatesSource( 'remote' );
-
+	this.startModal = function( customStartIntent ) {
 		if ( ! layout ) {
 			initLayout();
 		}
 
-		layout.showLoadingView();
+		layout.showModal();
 
-		self.requestRemoteTemplates( function() {
-			if ( onModalReady ) {
-				onModalReady();
-			}
+		self.requestLibraryData( {
+			onBeforeUpdate: layout.showLoadingView.bind( layout ),
+			onUpdate: function() {
+				var documentType = elementor.config.document.remote_type,
+					isBlockType = -1 !== config.categories.indexOf( documentType ),
+					oldStartIntent = Object.create( startIntent );
+
+				startIntent = jQuery.extend( {
+					filters: {
+						source: 'remote',
+						type: isBlockType ? 'block' : 'page',
+						subtype: isBlockType ? documentType : null,
+					},
+					onReady: self.showTemplates,
+				}, customStartIntent );
+
+				var isSameIntent = _.isEqual( Object.getPrototypeOf( oldStartIntent ), startIntent );
+
+				if ( isSameIntent && 'elementor-template-library-templates' === layout.modalContent.currentView.id ) {
+					return;
+				}
+
+				layout.hideLoadingView();
+
+				setIntentFilters();
+
+				startIntent.onReady();
+			},
 		} );
 	};
 
 	this.closeModal = function() {
-		self.getModal().hide();
+		layout.hideModal();
 	};
 
-	this.setTemplatesSource = function( source, trigger ) {
-		var channel = elementor.channels.templates;
+	this.getFilter = function( name ) {
+		return elementor.channels.templates.request( 'filter:' + name );
+	};
 
-		channel.reply( 'filter:source', source );
+	this.setFilter = function( name, value, silent ) {
+		elementor.channels.templates.reply( 'filter:' + name, value );
 
-		if ( trigger ) {
-			channel.trigger( 'filter:change' );
+		if ( ! silent ) {
+			elementor.channels.templates.trigger( 'filter:change' );
+		}
+	};
+
+	this.getFilterTerms = function( termName ) {
+		if ( termName ) {
+			return filterTerms[ termName ];
+		}
+
+		return filterTerms;
+	};
+
+	this.setTemplatesPage = function( source, type, silent ) {
+		elementor.channels.templates.stopReplying();
+
+		self.setFilter( 'source', source, true );
+
+		if ( type ) {
+			self.setFilter( 'type', type, true );
+		}
+
+		if ( ! silent ) {
+			self.showTemplates();
 		}
 	};
 
 	this.showTemplates = function() {
-		layout.showTemplatesView( templatesCollection );
-	};
+		var activeSource = self.getFilter( 'source' );
 
-	this.showTemplatesModal = function() {
-		self.startModal( self.showTemplates );
+		var templatesToShow = templatesCollection.filter( function( model ) {
+			if ( activeSource !== model.get( 'source' ) ) {
+				return false;
+			}
+
+			var typeInfo = templateTypes[ model.get( 'type' ) ];
+
+			return ! typeInfo || false !== typeInfo.showInLibrary;
+		} );
+
+		layout.showTemplatesView( new TemplateLibraryCollection( templatesToShow ) );
 	};
 
 	this.showErrorDialog = function( errorMessage ) {
@@ -256,8 +386,8 @@ TemplateLibraryManager = function() {
 		}
 
 		self.getErrorDialog()
-		    .setMessage( elementor.translate( 'templates_request_error' ) + '<div id="elementor-template-library-error-info">' + errorMessage + '</div>' )
-		    .show();
+			.setMessage( elementor.translate( 'templates_request_error' ) + '<div id="elementor-template-library-error-info">' + errorMessage + '</div>' )
+			.show();
 	};
 };
 

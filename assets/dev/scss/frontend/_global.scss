@@ -31,8 +31,8 @@
 		box-shadow: none;
 	}
 
-	figure {
-		margin: 0;
+	.elementor-widget:not(.elementor-widget-text-editor) figure {
+			margin: 0;
 	}
 
 	// Responsive Embed
@@ -44,6 +44,7 @@
 		width: 100%;
 		margin: 0;
 		line-height: 1;
+		border: none;
 	}
 
 	.elementor-custom-embed {
@@ -59,6 +60,23 @@
 		position: absolute;
 		overflow: hidden;
 		z-index: $ground-layer;
+		transition: opacity 1s;
+		pointer-events: none; // This prevents the player from showing video info on hover
+
+		&.elementor-loading {
+			opacity: 0;
+		}
+	}
+
+	.elementor-background-video-embed {
+		max-width: none; //Stretch the background video on all section
+	}
+
+	.elementor-background-video-embed, .elementor-background-video-hosted {
+		position: absolute;
+		top: 50%;
+		left: 50%; //reset when the parent has set text-align: center;
+		transform: translateX(-50%) translateY(-50%);
 	}
 
 	.elementor-background-video {
@@ -81,10 +99,10 @@
 		left: 0;
 		position: absolute;
 	}
+}
 
-	.elementor-invisible {
-		visibility: hidden;
-	}
+.elementor-invisible {
+	visibility: hidden;
 }
 
 // Alignment Classes
@@ -120,6 +138,52 @@
 			width: 100%;
 		}
 	}
+}
+
+.elementor-custom-embed-play {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translateX(-50%) translateY(-50%);
+
+	i {
+		font-size: 100px;
+		color: #fff;
+		opacity: 0.8;
+		text-shadow: 1px 0 6px rgba(0, 0, 0, 0.3);
+		transition: all .5s;
+	}
+
+	&.elementor-playing {
+
+		i {
+			font-family: 'FontAwesome';
+			animation: fa-spin 2s infinite linear;
+
+			&:before {
+				content: "\f1ce";
+			}
+		}
+	}
+}
+
+.elementor-swiper-button {
+	position: absolute;
+	display: inline-flex; // Position exactly in center
+	z-index: 1;
+	cursor: pointer;
+	font-size: 25px;
+	color: $slides_gui;
+	top: 50%;
+	transform: translateY(-50%);
+
+	&.swiper-button-disabled {
+		opacity: 0.3;
+	}
+}
+
+.elementor-tag {
+	display: inline-flex;
 }
 
 // Alignment for Tablet
@@ -199,14 +263,17 @@
 }
 
 // Admin Bar - Icon (Front-End)
-#wpadminbar #wp-admin-bar-elementor_edit_page > .ab-item::before {
-	content: "\e800";
-	font-family: eicon;
-	font-size: 12px;
-	margin-top: 5px;
-}
+#wpadminbar {
 
-// TEMP CODE
-#elementor-select-preset {
-	 display: none;
+	#wp-admin-bar-elementor_edit_page > .ab-item::before {
+		content: "\e801";
+		font-family: eicons;
+		top: 3px;
+		font-size: 18px;
+	}
+
+	#wp-admin-bar-elementor_inspector > .ab-item::before {
+		content: "\f348";
+		top: 2px;
+	}
 }

@@ -7,9 +7,9 @@ helpers = {
 		section: {
 			column: {
 				widget: null,
-				section: null
-			}
-		}
+				section: null,
+			},
+		},
 	},
 
 	enqueueFont: function( font ) {
@@ -17,16 +17,16 @@ helpers = {
 			return;
 		}
 
-		var fontType = elementor.config.controls.font.fonts[ font ],
+		var fontType = elementor.config.controls.font.options[ font ],
 			fontUrl,
 
 			subsets = {
-				'ru_RU': 'cyrillic',
-				'uk': 'cyrillic',
-				'bg_BG': 'cyrillic',
-				'vi': 'vietnamese',
-				'el': 'greek',
-				'he_IL': 'hebrew'
+				ru_RU: 'cyrillic',
+				uk: 'cyrillic',
+				bg_BG: 'cyrillic',
+				vi: 'vietnamese',
+				el: 'greek',
+				he_IL: 'hebrew',
 			};
 
 		switch ( fontType ) {
@@ -48,7 +48,14 @@ helpers = {
 		if ( ! _.isEmpty( fontUrl ) ) {
 			elementor.$previewContents.find( 'link:last' ).after( '<link href="' + fontUrl + '" rel="stylesheet" type="text/css">' );
 		}
+
 		this._enqueuedFonts.push( font );
+
+		elementor.channels.editor.trigger( 'font:insertion', fontType, font );
+	},
+
+	resetEnqueuedFontsCache: function() {
+		this._enqueuedFonts = [];
 	},
 
 	getElementChildType: function( elementType, container ) {
@@ -57,8 +64,7 @@ helpers = {
 		}
 
 		if ( undefined !== container[ elementType ] ) {
-
-			if ( Backbone.$.isPlainObject( container[ elementType ] ) ) {
+			if ( jQuery.isPlainObject( container[ elementType ] ) ) {
 				return Object.keys( container[ elementType ] );
 			}
 
@@ -66,12 +72,11 @@ helpers = {
 		}
 
 		for ( var type in container ) {
-
 			if ( ! container.hasOwnProperty( type ) ) {
 				continue;
 			}
 
-			if ( ! Backbone.$.isPlainObject( container[ type ] ) ) {
+			if ( ! jQuery.isPlainObject( container[ type ] ) ) {
 				continue;
 			}
 
@@ -86,17 +91,12 @@ helpers = {
 	},
 
 	getUniqueID: function() {
-		var id;
-
-		// TODO: Check conflict models
-		//while ( true ) {
-			id = Math.random().toString( 36 ).substr( 2, 7 );
-			//if ( 1 > $( 'li.item-id-' + id ).length ) {
-				return id;
-			//}
-		//}
+		return Math.random().toString( 16 ).substr( 2, 7 );
 	},
 
+	/*
+	 * @deprecated 2.0.0
+	 */
 	stringReplaceAll: function( string, replaces ) {
 		var re = new RegExp( Object.keys( replaces ).join( '|' ), 'gi' );
 
@@ -106,18 +106,21 @@ helpers = {
 	},
 
 	isActiveControl: function( controlModel, values ) {
-		var condition;
+		var condition,
+			conditions;
 
 		// TODO: Better way to get this?
 		if ( _.isFunction( controlModel.get ) ) {
 			condition = controlModel.get( 'condition' );
+			conditions = controlModel.get( 'conditions' );
 		} else {
 			condition = controlModel.condition;
+			conditions = controlModel.conditions;
 		}
 
-		// Repeater items conditions
-		if ( controlModel.conditions ) {
-			return elementor.conditions.check( controlModel.conditions, values );
+		// Multiple conditions with relations.
+		if ( conditions ) {
+			return elementor.conditions.check( conditions, values );
 		}
 
 		if ( _.isEmpty( condition ) ) {
@@ -126,12 +129,20 @@ helpers = {
 
 		var hasFields = _.filter( condition, function( conditionValue, conditionName ) {
 			var conditionNameParts = conditionName.match( /([a-z_0-9]+)(?:\[([a-z_]+)])?(!?)$/i ),
-				conditionRealName = conditionNameParts[1],
-				conditionSubKey = conditionNameParts[2],
-				isNegativeCondition = !! conditionNameParts[3],
+				conditionRealName = conditionNameParts[ 1 ],
+				conditionSubKey = conditionNameParts[ 2 ],
+				isNegativeCondition = !! conditionNameParts[ 3 ],
 				controlValue = values[ conditionRealName ];
 
-			if ( conditionSubKey ) {
+			if ( values.__dynamic__ && values.__dynamic__[ conditionRealName ] ) {
+				controlValue = values.__dynamic__[ conditionRealName ];
+			}
+
+			if ( undefined === controlValue ) {
+				return true;
+			}
+
+			if ( conditionSubKey && 'object' === typeof controlValue ) {
 				controlValue = controlValue[ conditionSubKey ];
 			}
 
@@ -139,6 +150,7 @@ helpers = {
 			// If the controlValue is a non empty array - check if the controlValue contains the conditionValue
 			// otherwise check if they are equal. ( and give the ability to check if the value is an empty array )
 			var isContains;
+
 			if ( _.isArray( conditionValue ) && ! _.isEmpty( conditionValue ) ) {
 				isContains = _.contains( conditionValue, controlValue );
 			} else if ( _.isArray( controlValue ) && ! _.isEmpty( controlValue ) ) {
@@ -154,13 +166,15 @@ helpers = {
 	},
 
 	cloneObject: function( object ) {
-		return JSON.parse( JSON.stringify( object ) );
+		elementorCommon.helpers.deprecatedMethod( 'elementor.helpers.cloneObject', '2.3.0', 'elementorCommon.helpers.cloneObject' );
+
+		return elementorCommon.helpers.cloneObject( object );
 	},
 
-	getYoutubeIDFromURL: function( url ) {
-		var videoIDParts = url.match( /^.*(?:youtu.be\/|v\/|e\/|u\/\w+\/|embed\/|v=)([^#\&\?]*).*/ );
+	firstLetterUppercase: function( string ) {
+		elementorCommon.helpers.deprecatedMethod( 'elementor.helpers.firstLetterUppercase', '2.3.0', 'elementorCommon.helpers.firstLetterUppercase' );
 
-		return videoIDParts && videoIDParts[1];
+		return elementorCommon.helpers.firstLetterUppercase( string );
 	},
 
 	disableElementEvents: function( $element ) {
@@ -171,7 +185,7 @@ helpers = {
 				return;
 			}
 
-			Backbone.$( this )
+			jQuery( this )
 				.data( 'backup-pointer-events', currentPointerEvents )
 				.css( 'pointer-events', 'none' );
 		} );
@@ -179,7 +193,7 @@ helpers = {
 
 	enableElementEvents: function( $element ) {
 		$element.each( function() {
-			var $this = Backbone.$( this ),
+			var $this = jQuery( this ),
 				backupPointerEvents = $this.data( 'backup-pointer-events' );
 
 			if ( undefined === backupPointerEvents ) {
@@ -204,7 +218,7 @@ helpers = {
 			} ),
 			defaultOptions = {
 				width: window.innerWidth >= 1440 ? 271 : 251,
-				palettes: _.pluck( items, 'value' )
+				palettes: _.pluck( items, 'value' ),
 			};
 
 		if ( options ) {
@@ -212,7 +226,103 @@ helpers = {
 		}
 
 		return $element.wpColorPicker( defaultOptions );
-	}
+	},
+
+	isInViewport: function( element, html ) {
+		var rect = element.getBoundingClientRect();
+		html = html || document.documentElement;
+		return (
+			rect.top >= 0 &&
+			rect.left >= 0 &&
+			rect.bottom <= ( window.innerHeight || html.clientHeight ) &&
+			rect.right <= ( window.innerWidth || html.clientWidth )
+		);
+	},
+
+	scrollToView: function( $element, timeout, $parent ) {
+		if ( undefined === timeout ) {
+			timeout = 500;
+		}
+
+		var $scrolled = $parent,
+			$elementorFrontendWindow = elementorFrontend.getElements( '$window' );
+
+		if ( ! $parent ) {
+			$parent = $elementorFrontendWindow;
+
+			$scrolled = elementor.$previewContents.find( 'html, body' );
+		}
+
+		setTimeout( function() {
+			var parentHeight = $parent.height(),
+				parentScrollTop = $parent.scrollTop(),
+				elementTop = $parent === $elementorFrontendWindow ? $element.offset().top : $element[ 0 ].offsetTop,
+				topToCheck = elementTop - parentScrollTop;
+
+			if ( topToCheck > 0 && topToCheck < parentHeight ) {
+				return;
+			}
+
+			var scrolling = elementTop - ( parentHeight / 2 );
+
+			$scrolled.stop( true ).animate( { scrollTop: scrolling }, 1000 );
+		}, timeout );
+	},
+
+	getElementInlineStyle: function( $element, properties ) {
+		var style = {},
+			elementStyle = $element[ 0 ].style;
+
+		properties.forEach( function( property ) {
+			style[ property ] = undefined !== elementStyle[ property ] ? elementStyle[ property ] : '';
+		} );
+
+		return style;
+	},
+
+	cssWithBackup: function( $element, backupState, rules ) {
+		var cssBackup = this.getElementInlineStyle( $element, Object.keys( rules ) );
+
+		$element
+			.data( 'css-backup-' + backupState, cssBackup )
+			.css( rules );
+	},
+
+	recoverCSSBackup: function( $element, backupState ) {
+		var backupKey = 'css-backup-' + backupState;
+
+		$element.css( $element.data( backupKey ) );
+
+		$element.removeData( backupKey );
+	},
+
+	compareVersions: function( versionA, versionB, operator ) {
+		var prepareVersion = function( version ) {
+			version = version + '';
+
+			return version.replace( /[^\d.]+/, '.-1.' );
+		};
+
+		versionA = prepareVersion( versionA );
+		versionB = prepareVersion( versionB );
+
+		if ( versionA === versionB ) {
+			return ! operator || /^={2,3}$/.test( operator );
+		}
+
+		var versionAParts = versionA.split( '.' ).map( Number ),
+			versionBParts = versionB.split( '.' ).map( Number ),
+			longestVersionParts = Math.max( versionAParts.length, versionBParts.length );
+
+		for ( var i = 0; i < longestVersionParts; i++ ) {
+			var valueA = versionAParts[ i ] || 0,
+				valueB = versionBParts[ i ] || 0;
+
+			if ( valueA !== valueB ) {
+				return this.conditions.compare( valueA, valueB, operator );
+			}
+		}
+	},
 };
 
 module.exports = helpers;

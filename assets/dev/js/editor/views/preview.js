@@ -1,6 +1,8 @@
 var BaseSectionsContainerView = require( 'elementor-views/base-sections-container' ),
 	Preview;
 
+import AddSectionView from './add-section/independent';
+
 Preview = BaseSectionsContainerView.extend( {
 	template: Marionette.TemplateCache.get( '#tmpl-elementor-preview' ),
 
@@ -8,79 +10,134 @@ Preview = BaseSectionsContainerView.extend( {
 
 	childViewContainer: '.elementor-section-wrap',
 
-	ui: {
-		addSectionArea: '#elementor-add-section',
-		addNewSection: '#elementor-add-new-section',
-		closePresetsIcon: '#elementor-select-preset-close',
-		addSectionButton: '#elementor-add-section-button',
-		addTemplateButton: '#elementor-add-template-button',
-		selectPreset: '#elementor-select-preset',
-		presets: '.elementor-preset'
+	behaviors: function() {
+		var parentBehaviors = BaseSectionsContainerView.prototype.behaviors.apply( this, arguments ),
+			behaviors = {
+				contextMenu: {
+					behaviorClass: require( 'elementor-behaviors/context-menu' ),
+					groups: this.getContextMenuGroups(),
+				},
+			};
+
+		if ( elementor.config.user.introduction ) {
+			behaviors.introduction = {
+				behaviorClass: require( 'elementor-behaviors/introduction' ),
+			};
+		}
+
+		return jQuery.extend( parentBehaviors, behaviors );
 	},
 
-	events: {
-		'click @ui.addSectionButton': 'onAddSectionButtonClick',
-		'click @ui.addTemplateButton': 'onAddTemplateButtonClick',
-		'click @ui.closePresetsIcon': 'closeSelectPresets',
-		'click @ui.presets': 'onPresetSelected'
+	getContextMenuGroups: function() {
+		var hasContent = function() {
+			return elementor.elements.length > 0;
+		};
+
+		return [
+			{
+				name: 'paste',
+				actions: [
+					{
+						name: 'paste',
+						title: elementor.translate( 'paste' ),
+						callback: this.paste.bind( this ),
+						isEnabled: this.isPasteEnabled.bind( this ),
+					},
+				],
+			}, {
+				name: 'content',
+				actions: [
+					{
+						name: 'copy_all_content',
+						title: elementor.translate( 'copy_all_content' ),
+						callback: this.copy.bind( this ),
+						isEnabled: hasContent,
+					}, {
+						name: 'delete_all_content',
+						title: elementor.translate( 'delete_all_content' ),
+						callback: elementor.clearPage.bind( elementor ),
+						isEnabled: hasContent,
+					},
+				],
+			},
+		];
 	},
 
-	closeSelectPresets: function() {
-		this.ui.addNewSection.show();
-		this.ui.selectPreset.hide();
-	},
-
-	onAddSectionButtonClick: function() {
-		this.ui.addNewSection.hide();
-		this.ui.selectPreset.show();
-	},
-
-	onAddTemplateButtonClick: function() {
-		elementor.templates.startModal( function() {
-			elementor.templates.showTemplates();
+	copy: function() {
+		elementor.setStorage( 'transfer', {
+			type: 'copy',
+			elementsType: 'section',
+			elements: elementor.elements.toJSON( { copyHtmlCache: true } ),
 		} );
 	},
 
-	onRender: function() {
-		var self = this;
+	paste: function( atIndex ) {
+		var self = this,
+			transferData = elementor.getStorage( 'transfer' ),
+			section,
+			index = undefined !== atIndex ? atIndex : this.collection.length;
 
-		self.ui.addSectionArea.html5Droppable( {
-			axis: [ 'vertical' ],
-			groups: [ 'elementor-element' ],
-			onDragEnter: function( side ) {
-				self.ui.addSectionArea.attr( 'data-side', side );
-			},
-			onDragLeave: function() {
-				self.ui.addSectionArea.removeAttr( 'data-side' );
-			},
-			onDropping: function() {
-				self.addSection().addElementFromPanel();
-			}
-		} );
-	},
+		elementor.channels.data.trigger( 'element:before:add', transferData.elements[ 0 ] );
 
-	onPresetSelected: function( event ) {
-		this.closeSelectPresets();
+		if ( 'section' === transferData.elementsType ) {
+			transferData.elements.forEach( function( element ) {
+				self.addChildElement( element, {
+					at: index,
+					edit: false,
+					clone: true,
+				} );
 
-		var selectedStructure = event.currentTarget.dataset.structure,
-			parsedStructure = elementor.presetsFactory.getParsedStructure( selectedStructure ),
-			elements = [],
-			loopIndex;
+				index++;
+			} );
+		} else if ( 'column' === transferData.elementsType ) {
+			section = self.addChildElement( { allowEmpty: true }, { at: atIndex } );
 
-		for ( loopIndex = 0; loopIndex < parsedStructure.columnsCount; loopIndex++ ) {
-			elements.push( {
-				id: elementor.helpers.getUniqueID(),
-				elType: 'column',
-				settings: {},
-				elements: []
+			section.model.unset( 'allowEmpty' );
+
+			index = 0;
+
+			transferData.elements.forEach( function( element ) {
+				section.addChildElement( element, {
+					at: index,
+					clone: true,
+				} );
+
+				index++;
+			} );
+
+			section.redefineLayout();
+		} else {
+			section = self.addChildElement( null, { at: atIndex } );
+
+			index = 0;
+
+			transferData.elements.forEach( function( element ) {
+				section.addChildElement( element, {
+					at: index,
+					clone: true,
+				} );
+
+				index++;
 			} );
 		}
 
-		var newSection = this.addSection( { elements: elements } );
+		elementor.channels.data.trigger( 'element:after:add', transferData.elements[ 0 ] );
+	},
 
-		newSection.setStructure( selectedStructure );
-		newSection.redefineLayout();
-	}
+	isPasteEnabled: function() {
+		return elementor.getStorage( 'transfer' );
+	},
+
+	onRender: function() {
+		if ( ! elementor.userCan( 'design' ) ) {
+			return;
+		}
+		var addNewSectionView = new AddSectionView();
+
+		addNewSectionView.render();
+
+		this.$el.append( addNewSectionView.$el );
+	},
 } );
 
 module.exports = Preview;

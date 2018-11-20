@@ -7,11 +7,11 @@ TemplateLibrarySaveTemplateView = Marionette.ItemView.extend( {
 
 	ui: {
 		form: '#elementor-template-library-save-template-form',
-		submitButton: '#elementor-template-library-save-template-submit'
+		submitButton: '#elementor-template-library-save-template-submit',
 	},
 
 	events: {
-		'submit @ui.form': 'onFormSubmit'
+		'submit @ui.form': 'onFormSubmit',
 	},
 
 	getSaveType: function() {
@@ -32,12 +32,12 @@ TemplateLibrarySaveTemplateView = Marionette.ItemView.extend( {
 			saveType = this.model ? this.model.get( 'elType' ) : 'page',
 			JSONParams = { removeDefault: true };
 
-		formData.data = this.model ? [ this.model.toJSON( JSONParams ) ] : elementor.elements.toJSON( JSONParams );
+		formData.content = this.model ? [ this.model.toJSON( JSONParams ) ] : elementor.elements.toJSON( JSONParams );
 
 		this.ui.submitButton.addClass( 'elementor-button-state' );
 
 		elementor.templates.saveTemplate( saveType, formData );
-	}
+	},
 } );
 
 module.exports = TemplateLibrarySaveTemplateView;

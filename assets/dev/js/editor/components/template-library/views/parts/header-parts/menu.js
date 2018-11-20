@@ -1,8 +1,6 @@
-var TemplateLibraryHeaderMenuView;
-
-TemplateLibraryHeaderMenuView = Marionette.ItemView.extend( {
+module.exports = Marionette.ItemView.extend( {
 	options: {
-		activeClass: 'elementor-active'
+		activeClass: 'elementor-active',
 	},
 
 	template: '#tmpl-elementor-template-library-header-menu',
@@ -10,11 +8,11 @@ TemplateLibraryHeaderMenuView = Marionette.ItemView.extend( {
 	id: 'elementor-template-library-header-menu',
 
 	ui: {
-		menuItems: '.elementor-template-library-menu-item'
+		menuItems: '.elementor-template-library-menu-item',
 	},
 
 	events: {
-		'click @ui.menuItems': 'onMenuItemClick'
+		'click @ui.menuItems': 'onMenuItemClick',
 	},
 
 	$activeItem: null,
@@ -36,19 +34,22 @@ TemplateLibraryHeaderMenuView = Marionette.ItemView.extend( {
 	},
 
 	onRender: function() {
-		var currentSource = elementor.channels.templates.request( 'filter:source' ),
+		var currentSource = elementor.templates.getFilter( 'source' ),
 			$sourceItem = this.ui.menuItems.filter( '[data-template-source="' + currentSource + '"]' );
+
+		if ( 'remote' === currentSource ) {
+			$sourceItem = $sourceItem.filter( '[data-template-type="' + elementor.templates.getFilter( 'type' ) + '"]' );
+		}
 
 		this.activateMenuItem( $sourceItem );
 	},
 
 	onMenuItemClick: function( event ) {
-		var item = event.currentTarget;
+		var item = event.currentTarget,
+			itemData = item.dataset;
 
-		this.activateMenuItem( Backbone.$( item ) );
+		this.activateMenuItem( jQuery( item ) );
 
-		elementor.templates.setTemplatesSource( item.dataset.templateSource, true );
-	}
+		elementor.templates.setTemplatesPage( item.dataset.templateSource, itemData.templateType );
+	},
 } );
-
-module.exports = TemplateLibraryHeaderMenuView;
